@@ -371,6 +371,14 @@ export async function ensureTool(
 		return undefined;
 	}
 
+	if (arch() !== "x64" && arch() !== "arm64") {
+		onStatus?.({
+			type: "warning",
+			message: `Automatic download of ${config.name} is not supported on ${platform()}/${arch()}. Install it with your system package manager.`,
+		});
+		return undefined;
+	}
+
 	// Tool not found - download it
 	onStatus?.({ type: "info", message: `${config.name} not found. Downloading...` });
 
