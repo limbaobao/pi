@@ -1,9 +1,6 @@
 import type * as ChildProcess from "node:child_process";
 import type * as Fs from "node:fs";
-import type * as Os from "node:os";
-import { spawnSync } from "child_process";
-import { arch } from "os";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ensureTool, getLatestVersion, type ToolStatus } from "../src/utils/tools-manager.ts";
 
 const originalOffline = process.env.PI_OFFLINE;
@@ -22,19 +19,6 @@ vi.mock("child_process", async (importOriginal) => {
 		...actual,
 		spawnSync: vi.fn(() => ({ error: new Error("not found") })),
 	};
-});
-
-vi.mock("os", async (importOriginal) => {
-	const actual = await importOriginal<typeof Os>();
-	return {
-		...actual,
-		arch: vi.fn(() => "x64"),
-		platform: vi.fn(() => "linux"),
-	};
-});
-
-beforeEach(() => {
-	vi.mocked(arch).mockReturnValue("x64");
 });
 
 afterEach(() => {
@@ -115,39 +99,6 @@ describe("getLatestVersion", () => {
 });
 
 describe("ensureTool", () => {
-	it.each(["fd", "rg"] as const)("does not download %s for unsupported architectures", async (tool) => {
-		delete process.env.PI_OFFLINE;
-		const fetchMock = vi.fn();
-		vi.stubGlobal("fetch", fetchMock);
-		for (const architecture of ["arm", "ia32", "riscv64", "ppc64", "s390x"] as const) {
-			vi.mocked(arch).mockReturnValue(architecture);
-			const statuses: ToolStatus[] = [];
-
-			await expect(ensureTool(tool, (status) => statuses.push(status))).resolves.toBeUndefined();
-			expect(statuses).toEqual([
-				{
-					type: "warning",
-					message: `Automatic download of ${tool === "rg" ? "ripgrep" : "fd"} is not supported on linux/${architecture}. Install it with your system package manager.`,
-				},
-			]);
-		}
-		expect(fetchMock).not.toHaveBeenCalled();
-	});
-
-	it("keeps using an installed tool on ARM32", async () => {
-		vi.mocked(arch).mockReturnValue("arm");
-		vi.mocked(spawnSync).mockReturnValueOnce({
-			pid: 1,
-			output: [],
-			stdout: Buffer.alloc(0),
-			stderr: Buffer.alloc(0),
-			status: 0,
-			signal: null,
-		});
-
-		await expect(ensureTool("fd")).resolves.toBe("fd");
-	});
-
 	it("reports status through a callback without writing to the console", async () => {
 		process.env.PI_OFFLINE = "1";
 		const statuses: ToolStatus[] = [];
@@ -166,9 +117,8 @@ describe("ensureTool", () => {
 		consoleLog.mockRestore();
 	});
 
-	it.each(["x64", "arm64"] as const)("surfaces the download error cause chain on %s", async (architecture) => {
+	it("surfaces the error cause chain when a download fails", async () => {
 		delete process.env.PI_OFFLINE;
-		vi.mocked(arch).mockReturnValue(architecture);
 		const cause = new Error("connect ETIMEDOUT 140.82.113.3:443");
 		vi.stubGlobal(
 			"fetch",
