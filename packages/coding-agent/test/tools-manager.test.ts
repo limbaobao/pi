@@ -115,6 +115,7 @@ describe("getLatestVersion", () => {
 });
 
 describe("ensureTool", () => {
+	// Regression for https://github.com/earendil-works/pi/issues/11209.
 	it.each(["fd", "rg"] as const)("does not download %s for unsupported architectures", async (tool) => {
 		delete process.env.PI_OFFLINE;
 		const fetchMock = vi.fn();
